@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="{{url_for('static',filename='addcategory.css')}}">
+</head>
+<body>
+    <form method="POST"enctype="multipart/form-data">
+        <input name="name" placeholder="Enter item name" type="text" required>
+        <input name="description" placeholder="Enter item Description" type="text" required>
+        <input name="quantity"placeholder="Enter the item Quantity" type="text"required>
+        <select name="category" id="">
+            <option value="electronics">electronics</option value>
+            <option value="grocery">grocery</option value>
+            <option value="fashion">fashion</option value>
+            <option value="home">home</option value>
+        </select>
+        <input name="price" placeholder="Price" type="text" required>
+        <input type="file" name="image" required>
+        <input type="submit" class="btn" required>
+    </form>
+</body>
+</html> 
