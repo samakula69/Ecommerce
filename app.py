@@ -12,8 +12,8 @@ client=razorpay.Client(auth=(RAZORPAY_KEY_ID,RAZORPAY_KEY_SECRET))
 from itemid import itemidotp
 mydb=mysql.connector.connect(host='localhost',
 user='root',
-password='root',
-db='ecommerce'
+password='admin',
+db='ecomerce'
 )
 app=Flask(__name__)
 app.secret_key='jnvnkdfjvndjs'
@@ -264,7 +264,7 @@ def index():
 def addcart(itemid,name,category,price,quantity):
     if not session.get('user'):
         return redirect(url_for('login'))
-    else: 
+    else:
         print(session)
         if itemid not in session.get(session['user'],{}):
             if session.get(session['user']) is None:
@@ -272,11 +272,14 @@ def addcart(itemid,name,category,price,quantity):
             session[session['user']][itemid]=[name,price,1,f'{itemid}.jpg',category]
             session.modified=True
             flash(f'{name} added to cart')
-            return '<h2>added to cart</h2>'
+            return redirect(url_for('addedsuccess'))
         session[session['user']][itemid][2]+=1
         session.modified=True
         flash(f'{name} quantity increased in the cart')
-        return '<h2>quantity increased in the cart</h2>'
+        return redirect(url_for('addedsuccess'))
+@app.route('/addedsucess')
+def addedsuccess():
+    return render_template('addedsucess.html')
 @app.route('/viewcart')
 def viewcart():
     if not session.get('user'):
@@ -341,45 +344,82 @@ def pay(itemid, name, price):
     except Exception as e:
         print(f"Error creating order: {str(e)}")
         return str(e), 400
-@app.route('/success',methods=['POST'])
+@app.route('/success', methods=['POST'])
 def success():
-    payment_id=request.form.get('razorpay_payment_id')
-    order_id=request.form.get('razorpay_order_id')
-    signature=request.form.get('razorpay_signature')
-    name=request.form.get('name')
-    itemid=request.form.get('itemid')
-    total_price=request.form.get('total_price')
-    qyt=request.form.get('qyt')
+    if session.get('user'):
+        
+        payment_id = request.form.get('razorpay_payment_id')
+        order_id = request.form.get('razorpay_order_id')
+        signature = request.form.get('razorpay_signature')
+        name = request.form.get('name')
+        itemid = request.form.get('itemid')
+        total_price = request.form.get('total_price')
+        qyt = request.form.get('qyt')
 
-    #verification process
-    params_dict={
-        'razorpay_order_id':order_id,
-        'razorpay_payment_id':payment_id,  
-        'razorpay_signature':signature
-    }
-    try: 
-        client.utility.verify_payment_signature(params_dict)
-        cursor=mydb.cursor(buffered=True)
-        cursor.execute('insert into orders(itemid,item_name,total_price,user,qty)values(%s,%s,%s,%s,%s)',
-        [itemid,name,total_price,session.get('user'),qyt])
-        mydb.commit()
-        cursor.close()
-        flash('Order placed sucessfully')
-        return 'orders'
-    except razorpay.errors.SignatureVerificationError:
-        return 'Payment verification failed!',400
+        # Validate qyt
+        if not qyt or not qyt.isdigit():
+            flash("Invalid quantity provided!")
+            return "Invalid quantity", 400
+
+        qyt = int(qyt)  # Convert to integer
+
+        # Verification process
+        params_dict = {
+            'razorpay_order_id': order_id,
+            'razorpay_payment_id': payment_id,
+            'razorpay_signature': signature
+        }
+        try:
+            client.utility.verify_payment_signature(params_dict)
+            cursor = mydb.cursor(buffered=True)
+            cursor.execute(
+                'INSERT INTO orders(itemid, item_name, total_price, user, qty) VALUES (%s, %s, %s, %s, %s)',
+                [itemid, name, total_price, session.get('user'), qyt]
+            )
+            mydb.commit()
+            cursor.close()
+            flash('Order placed successfully')
+            return redirect(url_for('orders'))
+        except razorpay.errors.SignatureVerificationError:
+            return 'Payment verification failed!', 400
+    else:
+        return redirect(url_for('login'))
 @app.route('/orders')
 def orders():
     if session.get('user'):
         user=session.get('user')
         cursor=mydb.cursor(buffered=True)
+        cursor.execute('select *from orders where user=%s',[user])
         data=cursor.fetchall()
         cursor.close()
-        return render_template ('orderdisplay.html',data=data)
+        return render_template('orderdisplay.html',data=data)
     else:
         return redirect(url_for('login'))
+@app.route('/contact', methods=['GET', 'POST'])
+def contact():
+    if request.method == 'POST':
+        name = request.form['name']
+        email = request.form['email']
+        message = request.form['message']
 
+        if not name or not email or not message:
+            flash("All fields are required!", "error")
+            return redirect(url_for('contact'))
+        
+        # Here, handle form data (e.g., store in a database, send email)
+        flash("Thank you for reaching out! We will get back to you soon.", "success")
+        return redirect(url_for('contact'))
+    
+    return render_template('contact.html')  
 
-
-if __name__== '_main_':
+@app.route('/search',methods=['GET','POST'])
+def search():
+    if request.method=='POST':
+        name=request.form['search']
+        print(name)
+        cursor=mydb.cursor()
+        cursor.execute('select *from additems where name=%s',[name])
+        data=cursor.fetchall()
+        return render_template('dashboard.html',items=data)
+if __name__ == '__main__':
     app.run(debug=True)
